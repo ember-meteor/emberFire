@@ -129,8 +129,14 @@ EmberFire.Array = Ember.ArrayProxy.extend(EmberFire.ObjectMixin, {
   },
 
   childChanged: function(snapshot) {
-    var idx = this._index.indexOf(snapshot.name());
-    this._array.replace(idx, 1, [snapshot.val()]);
+    var idx      = this._index.indexOf(snapshot.name()),
+        existing = this._array.objectAt(idx),
+        isObject = (existing instanceof EmberFire.Object);
+
+    if (!isObject) {
+      var object = EmberFire.coerce(snapshot);
+      this._array.replace(idx, 1, [object]);
+    }
   },
 
   replaceContent: function(idx, amt, objects) {
