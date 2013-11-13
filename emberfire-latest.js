@@ -24,30 +24,31 @@ EmberFire.coerce = function(snapshot) {
 
 EmberFire.ObjectMixin = Ember.Mixin.create({
   type: null,
+  typeKey: "_type",
 
   init: function() {
-    this.ref.child("_type").set(this.type);
+    this.ref.child(this.typeKey).set(this.type);
 
     this.ref.on("child_added", function(snapshot) {
-      if (snapshot.name() != "_type") {
+      if (snapshot.name() != this.typeKey) {
         this.childAdded(snapshot);
       }
     }, this);
 
     this.ref.on("child_removed", function(snapshot) {
-      if (snapshot.name() != "_type") {
+      if (snapshot.name() != this.typeKey) {
         this.childRemoved(snapshot);
       }
     }, this);
 
     this.ref.on("child_changed", function(snapshot) {
-      if (snapshot.name() != "_type") {
+      if (snapshot.name() != this.typeKey) {
         this.childChanged(snapshot);
       }
     }, this);
 
     this.ref.on("value", function(snapshot) {
-      if (snapshot.name() != "_type") {
+      if (snapshot.name() != this.typeKey) {
         this.valueChanged(snapshot);
       }
     }, this);
