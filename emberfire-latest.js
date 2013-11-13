@@ -107,6 +107,8 @@ EmberFire.Object = Ember.ObjectProxy.extend(EmberFire.ObjectMixin, {
 EmberFire.Array = Ember.ArrayProxy.extend(EmberFire.ObjectMixin, {
   type: "array",
 
+  coerceChild: EmberFire.coerce,
+
   init: function() {
     this._array = Ember.A([]);
     this._index = Ember.A([]);
@@ -115,7 +117,7 @@ EmberFire.Array = Ember.ArrayProxy.extend(EmberFire.ObjectMixin, {
   },
 
   childAdded: function(snapshot) {
-    var object = EmberFire.coerce(snapshot),
+    var object = this.coerceChild(snapshot),
         key    = snapshot.name();
 
     this._index.pushObject(key);
@@ -134,7 +136,7 @@ EmberFire.Array = Ember.ArrayProxy.extend(EmberFire.ObjectMixin, {
         isObject = (existing instanceof EmberFire.Object);
 
     if (!isObject) {
-      var object = EmberFire.coerce(snapshot);
+      var object = this.coerceChild(snapshot);
       this._array.replace(idx, 1, [object]);
     }
   },
@@ -169,17 +171,7 @@ EmberFire.Array = Ember.ArrayProxy.extend(EmberFire.ObjectMixin, {
 EmberFire.ObjectArray = EmberFire.Array.extend({
   type: "objectArray",
 
-  childAdded: function(snapshot) {
-    var ref = snapshot.ref(),
-        name = snapshot.name(),
-        object = EmberFire.Object.create({ ref: ref });
-
-    this._index.pushObject(name);
-    this._array.pushObject(object);
-  },
-
-  childChanged: function() {
-    // the child in an EmberFire.Object
-    // no need to do anything
+  coerceChild: function(snapshot) {
+    return EmberFire.Object.create({ ref: snapshot.ref() });
   }
 });
