@@ -2,86 +2,30 @@
 
 var EmberFire = Ember.Namespace.create();
 
-EmberFire._checkType = function(snapshot, cb, binding) {
-  var obj = snapshot.val();
-  var type = obj._type;
+EmberFire.coerce = function(snapshot) {
+  var object = snapshot.val(),
+      ref    = snapshot.ref(),
+      type   = object._type;
 
   switch (type) {
   case "object":
-    cb.call(binding, EmberFire.Object.create({ ref: snapshot.ref() }));
+    object = EmberFire.Object.create({ ref: ref });
     break;
   case "array":
-    cb.call(binding, EmberFire.Array.create({ ref: snapshot.ref() }));
+    object = EmberFire.Array.create({ ref: ref });
     break;
-  default:
-    cb.call(binding, obj);
+  case "objectArray":
+    object = EmberFire.ObjectArray.create({ ref: ref });
+    break;
   }
+
+  return object;
 };
 
-EmberFire.Object = Ember.ObjectProxy.extend({
-  init: function() {
-    var object = {};
-    this.set("content", object);
-
-    function applyChange(snapshot) {
-      var key = snapshot.name();
-      /*jshint validthis:true */
-      EmberFire._checkType(snapshot, function(val) {
-        Ember.set(object, key, val);
-      }, this);
-    }
-
-    this.ref.child("_type").set("object");
-
-    this.ref.on("child_added", applyChange, this);
-
-    this.ref.on("child_changed", applyChange, this);
-
-    this.ref.on("child_removed", function(snapshot) {
-      this.set(snapshot.name(), null);
-    }, this);
-
-    this._super();
-  },
-
-  willDestroy: function() {
-    this.ref.off();
-  },
-
-  toJSON: function() {
-    var json = {},
-        object = this.get("content");
-
-    for (var key in object) {
-      json[key] = Ember.get(object, key);
-    }
-
-    json._type = "object";
-    return json;
-  },
-
-  setUnknownProperty: function(key, value) {
-    if (value instanceof EmberFire.Object || value instanceof EmberFire.Array) {
-      value.ref = this.ref.child(key);
-      value.ref.set(value.toJSON());
-    } else {
-      this.ref.child(key).set(value);
-      return this._super(key, value);
-    }
-  },
-
-  ref: null
-});
-
-EmberFire.Array = Ember.ArrayProxy.extend({
-  type: "array",
+EmberFire.ObjectMixin = Ember.Mixin.create({
+  type: null,
 
   init: function() {
-    this._array = Ember.A([]);
-    this._index = Ember.A([]);
-
-    this.set("content", this._array);
-
     this.ref.child("_type").set(this.type);
 
     this.ref.on("child_added", function(snapshot) {
@@ -102,14 +46,80 @@ EmberFire.Array = Ember.ArrayProxy.extend({
       }
     }, this);
 
+    this.ref.on("value", function(snapshot) {
+      if (snapshot.name() != "_type") {
+        this.valueChanged(snapshot);
+      }
+    }, this);
+
+    this._super();
+  },
+
+  childAdded: function(){
+  },
+
+  childChanged: function(){
+  },
+
+  childRemoved: function(){
+  },
+
+  valueChanged: function(){
+  },
+
+  willDestroy: function() {
+    this.ref.off();
+  }
+});
+
+EmberFire.Object = Ember.ObjectProxy.extend(EmberFire.ObjectMixin, {
+  type: "object",
+  ref: null,
+
+  init: function() {
+    this.set("content", {});
+
+    this._super();
+  },
+
+  valueChanged: function(snapshot){
+    this.set("content", snapshot.val());
+  },
+
+  toJSON: function() {
+    var json = {},
+        object = this.get("content");
+
+    for (var key in object) {
+      json[key] = Ember.get(object, key);
+    }
+
+    json._type = "object";
+    return json;
+  },
+
+  setUnknownProperty: function(key, value) {
+    this.ref.child(key).set(value);
+    return this._super(key, value);
+  }
+});
+
+EmberFire.Array = Ember.ArrayProxy.extend(EmberFire.ObjectMixin, {
+  type: "array",
+
+  init: function() {
+    this._array = Ember.A([]);
+    this._index = Ember.A([]);
+    this.set("content", this._array);
     this._super();
   },
 
   childAdded: function(snapshot) {
-    EmberFire._checkType(snapshot, function(val) {
-      this._index.pushObject(snapshot.name());
-      this._array.pushObject(val);
-    }, this);
+    var object = EmberFire.coerce(snapshot),
+        key    = snapshot.name();
+
+    this._index.pushObject(key);
+    this._array.pushObject(object);
   },
 
   childRemoved: function(snapshot) {
