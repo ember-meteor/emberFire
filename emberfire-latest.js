@@ -22,55 +22,63 @@ EmberFire.coerce = function(snapshot) {
   return object;
 };
 
-EmberFire.ObjectMixin = Ember.Mixin.create({
+EmberFire.ObjectMixin = Ember.Mixin.create(Ember.Evented, {
   type: null,
   typeKey: "_type",
 
   init: function() {
     this.ref.child(this.typeKey).set(this.type);
 
-    this.ref.on("child_added", function(snapshot) {
-      if (snapshot.name() != this.typeKey) {
-        this.childAdded(snapshot);
-      }
-    }, this);
-
-    this.ref.on("child_removed", function(snapshot) {
-      if (snapshot.name() != this.typeKey) {
-        this.childRemoved(snapshot);
-      }
-    }, this);
-
-    this.ref.on("child_changed", function(snapshot) {
-      if (snapshot.name() != this.typeKey) {
-        this.childChanged(snapshot);
-      }
-    }, this);
-
-    this.ref.on("value", function(snapshot) {
-      if (snapshot.name() != this.typeKey) {
-        this.valueChanged(snapshot);
-      }
-    }, this);
+    this.ref.on("child_added", this.onAdded, this);
+    this.ref.on("child_changed", this.onChanged, this);
+    this.ref.on("child_removed", this.onRemoved, this);
+    this.ref.on("value", this.onValue, this);
 
     this._super();
   },
 
-  childAdded: function(){
-  },
-
-  childChanged: function(){
-  },
-
-  childRemoved: function(){
-  },
-
-  valueChanged: function(){
-  },
-
   willDestroy: function() {
-    this.ref.off();
-  }
+    this.ref.off("child_added", this.onAdded, this);
+    this.ref.off("child_changed", this.onChanged, this);
+    this.ref.off("child_removed", this.onRemoved, this);
+    this.ref.off("value", this.onValue, this);
+  },
+
+  onAdded: function(snapshot) {
+    if (snapshot.name() != this.typeKey) {
+      this.trigger('added', snapshot);
+      this.childAdded(snapshot);
+    }
+  },
+
+  onChanged: function(snapshot) {
+    if (snapshot.name() != this.typeKey) {
+      this.trigger('changed', snapshot);
+      this.childRemoved(snapshot);
+    }
+  },
+
+  onRemoved: function(snapshot) {
+    if (snapshot.name() != this.typeKey) {
+      this.trigger('removed', snapshot);
+      this.childChanged(snapshot);
+    }
+  },
+
+  onValue: function(snapshot) {
+    if (snapshot.name() != this.typeKey) {
+      this.trigger('value', snapshot);
+      this.valueChanged(snapshot);
+    }
+  },
+
+  childAdded: function(){ },
+
+  childChanged: function(){ },
+
+  childRemoved: function(){ },
+
+  valueChanged: function(){ }
 });
 
 EmberFire.Object = Ember.ObjectProxy.extend(EmberFire.ObjectMixin, {
@@ -78,13 +86,13 @@ EmberFire.Object = Ember.ObjectProxy.extend(EmberFire.ObjectMixin, {
   ref: null,
 
   init: function() {
-    this.set("content", {});
+    Ember.set(this, 'content', { });
 
     this._super();
   },
 
   valueChanged: function(snapshot){
-    this.set("content", snapshot.val());
+    Ember.set(this, 'content', snapshot.val());
   },
 
   toJSON: function() {
@@ -99,9 +107,15 @@ EmberFire.Object = Ember.ObjectProxy.extend(EmberFire.ObjectMixin, {
     return json;
   },
 
-  setUnknownProperty: function(key, value) {
-    this.ref.child(key).set(value);
-    return this._super(key, value);
+  set: function(key, value, callback) {
+    key = key.replace(/\./g, '/');
+    this.ref.child(key).set(value, function(error) {
+      if(callback) {
+        callback(error, key, value);
+      } else if(error) {
+        throw error;
+      }
+    });
   }
 });
 
